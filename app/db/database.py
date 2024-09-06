@@ -21,6 +21,7 @@ class UserModel(Base):
     hashed_password = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # messages = relationship("MessageModel", back_populates="sender")  # 添加这行
 
 class BotModel(Base):
     __tablename__ = "bots"
@@ -49,7 +50,9 @@ class MessageModel(Base):
 
     id = Column(String(26), primary_key=True, default=lambda: str(ULID()), index=True)
     chat_id = Column(String(26), ForeignKey("chats.id"))
-    sender_id = Column(String(26), ForeignKey("users.id"))  # 可以是用户ID或bot ID
+    sender_id = Column(String(26))
+    sender_type = Column(String)  # 新增字段，用于区分发送者类型（"user" 或 "bot"）
+    role = Column(String)
     content = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -65,4 +68,9 @@ async def drop_all_tables():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
-__all__ = ["init_db", "get_db", "UserModel", "BotModel", "ChatModel", "MessageModel", "drop_all_tables"]
+async def execute_query(query):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(query)
+        return result.scalars().all()
+
+__all__ = ["init_db", "get_db", "UserModel", "BotModel", "ChatModel", "MessageModel", "drop_all_tables", "execute_query"]

@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.bot import BotCreate, Bot
-from app.utils.database import BotModel
+from app.db.database import BotModel
 
 async def create_bot(db: AsyncSession, bot: BotCreate) -> Bot:
     db_bot = BotModel(**bot.model_dump())

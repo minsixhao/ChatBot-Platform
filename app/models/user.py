@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr, ConfigDict
 from datetime import datetime
+from sqlalchemy.orm import relationship
 
 class UserBase(BaseModel):
     username: str

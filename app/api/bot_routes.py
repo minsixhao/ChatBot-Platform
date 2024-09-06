@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.bot import BotCreate, Bot
 from app.services.bot_service import create_bot, get_bot
-from app.utils.database import get_db
+from app.db.database import get_db
 
 router = APIRouter()
 

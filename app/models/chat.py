@@ -1,7 +1,16 @@
-from pydantic import BaseModel, ConfigDict
-from typing import Optional
+from enum import Enum
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Optional, List
 from datetime import datetime
+from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Enum as SQLAlchemyEnum
+from sqlalchemy.ext.declarative import declarative_base
+from .enums import SenderType, MessageRole  # 确保这行正确导入
+from app.db.database import Base, Column, String, DateTime, ForeignKey, Boolean
+from ulid import ULID
 
+Base = declarative_base()
+
+# Pydantic models
 class UserBase(BaseModel):
     username: str
     email: str
@@ -32,6 +41,23 @@ class Bot(BotBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+class MessageBase(BaseModel):
+    role: MessageRole
+    content: str
+
+class MessageCreate(MessageBase):
+    sender_id: str
+    sender_type: SenderType  # 确保这里是枚举类型
+
+class Message(MessageBase):
+    id: str = Field(max_length=30)
+    chat_id: str = Field(max_length=30)
+    sender_id: str
+    sender_type: SenderType
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
 class ChatBase(BaseModel):
     title: str
 
@@ -49,15 +75,66 @@ class Chat(ChatBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-class MessageBase(BaseModel):
+# SQLAlchemy models
+class UserModel(Base):
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True)
+    username = Column(String, unique=True)
+    email = Column(String, unique=True)
+    created_at = Column(DateTime)
+    updated_at = Column(DateTime)
+
+class BotModel(Base):
+    __tablename__ = "bots"
+
+    id = Column(String, primary_key=True)
+    name = Column(String)
+    description = Column(String)
+    creator_id = Column(String, ForeignKey("users.id"))
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime)
+    updated_at = Column(DateTime)
+
+class ChatModel(Base):
+    __tablename__ = "chats"
+
+    id = Column(String, primary_key=True)
+    title = Column(String)
+    creator_id = Column(String, ForeignKey("users.id"))
+    bot_id = Column(String, ForeignKey("bots.id"))
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class MessageModel(Base):
+    __tablename__ = "messages"
+
+    id = Column(String(26), primary_key=True, default=lambda: str(ULID()), index=True)
+    chat_id = Column(String(26), ForeignKey("chats.id"))
+    sender_id = Column(String(26))
+    sender_type = Column(SQLAlchemyEnum(SenderType))  # 修改这行
+    role = Column(SQLAlchemyEnum(MessageRole))  # 修改这行
+    content = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# Pydantic模型用于API交互
+class ChatPydantic(BaseModel):
+    id: str
+    title: str
+    creator_id: str
+    bot_id: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class MessagePydantic(BaseModel):
+    id: str
+    role: MessageRole
     content: str
     sender_id: str
-
-class MessageCreate(MessageBase):
-    pass
-
-class Message(MessageBase):
-    id: str
     chat_id: str
     created_at: datetime
 
