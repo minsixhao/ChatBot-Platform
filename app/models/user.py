@@ -1,10 +1,9 @@
 from pydantic import BaseModel, EmailStr, ConfigDict
 from datetime import datetime
-from sqlalchemy.orm import relationship
 
 class UserBase(BaseModel):
     username: str
-    email: EmailStr
+    email: EmailStr | None = None
 
 class UserCreate(UserBase):
     password: str
@@ -18,3 +17,7 @@ class User(UserBase):
 
 class UserInDB(User):
     hashed_password: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str

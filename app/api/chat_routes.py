@@ -1,42 +1,86 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.chat import Chat, ChatCreate, Message, MessageCreate
-from app.services.chat_service import create_chat, get_chat, add_message, get_chat_messages, chat_with_bot
-from app.db.database import get_db  # 修改这一行
+from app.db.database import get_db
+from app.services.chat_service import ChatService
+from app.services.bot_service import BotService
+from app.models.schemas import ChatCreate, Chat, MessageCreate, Message
+from typing import List
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+def get_chat_service(db: AsyncSession = Depends(get_db)):
+    bot_service = BotService(db)
+    return ChatService(db, bot_service)
+
 @router.post("/", response_model=Chat)
-async def create_chat_route(chat: ChatCreate, db: AsyncSession = Depends(get_db)):
-    return await create_chat(db, chat)
+async def create_chat(chat: ChatCreate, chat_service: ChatService = Depends(get_chat_service)):
+    return await chat_service.create_chat(chat)
+
+@router.get("/all", response_model=List[Chat])
+async def get_all_chats(chat_service: ChatService = Depends(get_chat_service)):
+    return await chat_service.get_all_chats()
 
 @router.get("/{chat_id}", response_model=Chat)
-async def get_chat_route(chat_id: str, db: AsyncSession = Depends(get_db)):
-    chat = await get_chat(db, chat_id)
-    if not chat:
-        raise HTTPException(status_code=404, detail="聊天未找到")
-    return chat
-
-@router.post("/{chat_id}/messages/", response_model=dict)
-async def add_message_route(chat_id: str, message: MessageCreate, db: AsyncSession = Depends(get_db)):
+async def get_chat(chat_id: str, chat_service: ChatService = Depends(get_chat_service)):
+    print(f"尝试获取聊天ID: {chat_id}")
     try:
-        if not hasattr(message, 'sender_type'):
-           message.sender_type = "user"
-        print("========message:", message)
-        result = await chat_with_bot(db, chat_id, message)
-        return result
-    except HTTPException as he:
-        raise he
+        chat = await chat_service.get_chat(chat_id)
+        if not chat:
+            print(f"未找到聊天ID: {chat_id}")
+            raise HTTPException(status_code=404, detail="聊天未找到")
+        print(f"成功获取聊天ID: {chat_id}")
+        return chat
+    except Exception as e:
+        print(f"获取聊天时发生错误: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取聊天时发生错误: {str(e)}")
+
+@router.get("/users/{user_id}", response_model=List[Chat])
+async def get_chat_history(user_id: str, limit: int = 10, chat_service: ChatService = Depends(get_chat_service)):
+    return await chat_service.get_chat_history(user_id, limit)
+
+# 添加消息到聊天
+@router.post("/{chat_id}/messages", response_model=List[Message])
+async def add_message_to_chat(
+    chat_id: str,
+    message: MessageCreate,
+    chat_service: ChatService = Depends(get_chat_service)
+):
+    try:
+        messages = await chat_service.add_message_and_get_caipan_reply(chat_id, message)
+        return messages
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{chat_id}/messages/", response_model=list[Message])
-async def get_chat_messages_route(chat_id: str, db: AsyncSession = Depends(get_db)):
-    messages = await get_chat_messages(db, chat_id)
-    if not messages:
-        raise HTTPException(status_code=404, detail="聊天消息未找到")
-    return messages
+@router.post("/join/{chat_id}/user/{user_id}", response_model=Chat)
+async def add_user_to_chat(chat_id: str, user_id: str, chat_service: ChatService = Depends(get_chat_service)):
+    print(f"API: 尝试将用户 {user_id} 添加到聊天 {chat_id}")
+    try:
+        result = await chat_service.add_user_to_chat(chat_id, user_id)
+        print("API: 用户成功添加到聊天")
+        return result
+    except ValueError as e:
+        print(f"API: 值错误 - {str(e)}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        print(f"API: 未知错误 - {str(e)}")
+        raise HTTPException(status_code=500, detail=f"发生未知错误: {str(e)}")
 
-# @router.post("/{chat_id}/chat_with_llm/", response_model=Message)
-# async def chat_with_llm_route(chat_id: str, message: MessageCreate, db: AsyncSession = Depends(get_db)):
-#     return await chat_with_llm(db, chat_id, message)
+@router.delete("/{chat_id}/user/{user_id}", response_model=Chat)
+async def remove_user_from_chat(chat_id: str, user_id: str, chat_service: ChatService = Depends(get_chat_service)):
+    try:
+        return await chat_service.remove_user_from_chat(chat_id, user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.get("/{chat_id}/messages/history", response_model=List[Message])
+async def get_chat_messages_history(chat_id: str, limit: int = 50, chat_service: ChatService = Depends(get_chat_service)):
+    try:
+        messages = await chat_service.get_chat_messages_history(chat_id, limit)
+        return messages
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

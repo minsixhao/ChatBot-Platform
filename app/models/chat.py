@@ -5,10 +5,18 @@ from datetime import datetime
 from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Enum as SQLAlchemyEnum
 from sqlalchemy.ext.declarative import declarative_base
 from .enums import SenderType, MessageRole  # 确保这行正确导入
-from app.db.database import Base, Column, String, DateTime, ForeignKey, Boolean
+from app.models.orm import Base
 from ulid import ULID
+from .schemas import MessageCreate  # 添加这行
 
-Base = declarative_base()
+# 删除这一行
+# from app.db.database import Base, Column, String, DateTime, ForeignKey, Boolean
+
+# 如果需要使用这些类型，可以从 sqlalchemy 直接导入
+from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean
+
+# 如果需要 Base 类，从 orm.py 导入
+from app.models.orm import Base
 
 # Pydantic models
 class UserBase(BaseModel):
@@ -45,10 +53,6 @@ class MessageBase(BaseModel):
     role: MessageRole
     content: str
 
-class MessageCreate(MessageBase):
-    sender_id: str
-    sender_type: SenderType  # 确保这里是枚举类型
-
 class Message(MessageBase):
     id: str = Field(max_length=30)
     chat_id: str = Field(max_length=30)
@@ -61,9 +65,12 @@ class Message(MessageBase):
 class ChatBase(BaseModel):
     title: str
 
-class ChatCreate(ChatBase):
+class ChatCreate(BaseModel):
+    title: str
+    chat_type: ChatType
     creator_id: str
-    bot_id: str
+    user_ids: List[str] = []
+    bot_ids: List[str] = []
 
 class Chat(ChatBase):
     id: str

@@ -10,9 +10,11 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
     ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost/dbname"
+    deepseek_api_key: str = os.getenv("DEEPSEEK_API_KEY")
 
     class Config:
         env_file = ".env"
+        env_file_encoding = "utf-8"
 
 settings = Settings()
 
